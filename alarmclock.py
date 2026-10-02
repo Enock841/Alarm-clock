@@ -1,86 +1,99 @@
-# Import Required Library
 from tkinter import *
 import datetime
-import time
-import winsound
-from threading import *
+import subprocess
 
-# Create Object
 root = Tk()
+root.geometry("400x380")
+root.title("Alarm Clock")
 
-# Set geometry
-root.geometry("400x200")
+alarm_target = None   # the exact datetime the alarm will ring
+ringing = False       # True while the chime is repeating
 
-# Use Threading
-def Threading():
-	t1=Thread(target=alarm)
-	t1.start()
+SOUNDS = ["Glass", "Ping", "Hero", "Funk", "Submarine", "Tink"]
 
-def alarm():
-	# Infinite Loop
-	while True:
-		# Set Alarm
-		set_alarm_time = f"{hour.get()}:{minute.get()}:{second.get()}"
+def play_sound():
+    subprocess.Popen(["afplay", f"/System/Library/Sounds/{sound.get()}.aiff"])
 
-		# Wait for one seconds
-		time.sleep(1)
+def ring():
+    # Play the chime, then repeat every 2 seconds until stopped
+    if ringing:
+        play_sound()
+        root.after(2000, ring)
 
-		# Get current time
-		current_time = datetime.datetime.now().strftime("%H:%M:%S")
-		print(current_time,set_alarm_time)
+def set_alarm():
+    global alarm_target, ringing
+    ringing = False
+    now = datetime.datetime.now()
+    target = now.replace(hour=int(hour.get()), minute=int(minute.get()),
+                         second=int(second.get()), microsecond=0)
+    if target <= now:                     # time already passed today -> tomorrow
+        target += datetime.timedelta(days=1)
+    alarm_target = target
 
-		# Check whether set alarm is equal to current time or not
-		if current_time == set_alarm_time:
-			print("Time to Wake up")
-			# Playing sound
-			winsound.PlaySound("sound.wav",winsound.SND_ASYNC)
+def stop_alarm():
+    global alarm_target, ringing
+    ringing = False
+    alarm_target = None
+    status.config(text="Alarm stopped", fg="gray")
 
-# Add Labels, Frame, Button, Optionmenus
-Label(root,text="Alarm Clock",font=("Helvetica 20 bold"),fg="red").pack(pady=10)
-Label(root,text="Set Time",font=("Helvetica 15 bold")).pack()
+def update_clock():
+    global alarm_target, ringing
+    now = datetime.datetime.now()
+
+    clock.config(text=now.strftime("%H:%M:%S"))
+    date_label.config(text=now.strftime("%A, %d %B %Y"))
+
+    if alarm_target:
+        if now >= alarm_target:           # reached or passed -> ring
+            alarm_target = None
+            ringing = True
+            status.config(text="Time to wake up!", fg="red")
+            ring()
+        else:
+            left = str(alarm_target - now).split(".")[0]
+            status.config(text=f"Alarm at {alarm_target.strftime('%H:%M:%S')}  (rings in {left})", fg="green")
+
+    root.after(200, update_clock)
+
+Label(root, text="Alarm Clock", font=("Helvetica 20 bold"), fg="red").pack(pady=(10, 0))
+
+clock = Label(root, text="", font=("Helvetica 32 bold"))
+clock.pack()
+date_label = Label(root, text="", font=("Helvetica 12"))
+date_label.pack()
+
+Label(root, text="Set Time", font=("Helvetica 15 bold")).pack(pady=(10, 0))
 
 frame = Frame(root)
 frame.pack()
 
-hour = StringVar(root)
-hours = ('00', '01', '02', '03', '04', '05', '06', '07',
-		'08', '09', '10', '11', '12', '13', '14', '15',
-		'16', '17', '18', '19', '20', '21', '22', '23', '24'
-		)
-hour.set(hours[0])
+hours = [f"{i:02d}" for i in range(24)]
+minutes = [f"{i:02d}" for i in range(60)]
+seconds = [f"{i:02d}" for i in range(60)]
 
-hrs = OptionMenu(frame, hour, *hours)
-hrs.pack(side=LEFT)
+now = datetime.datetime.now()
+hour = StringVar(root, now.strftime("%H"))
+minute = StringVar(root, now.strftime("%M"))
+second = StringVar(root, "00")
 
-minute = StringVar(root)
-minutes = ('00', '01', '02', '03', '04', '05', '06', '07',
-		'08', '09', '10', '11', '12', '13', '14', '15',
-		'16', '17', '18', '19', '20', '21', '22', '23',
-		'24', '25', '26', '27', '28', '29', '30', '31',
-		'32', '33', '34', '35', '36', '37', '38', '39',
-		'40', '41', '42', '43', '44', '45', '46', '47',
-		'48', '49', '50', '51', '52', '53', '54', '55',
-		'56', '57', '58', '59', '60')
-minute.set(minutes[0])
+OptionMenu(frame, hour, *hours).pack(side=LEFT)
+OptionMenu(frame, minute, *minutes).pack(side=LEFT)
+OptionMenu(frame, second, *seconds).pack(side=LEFT)
 
-mins = OptionMenu(frame, minute, *minutes)
-mins.pack(side=LEFT)
+Label(root, text="Chime sound", font=("Helvetica 12 bold")).pack(pady=(10, 0))
+sound_frame = Frame(root)
+sound_frame.pack()
+sound = StringVar(root, "Glass")
+OptionMenu(sound_frame, sound, *SOUNDS).pack(side=LEFT)
+Button(sound_frame, text="Test", command=play_sound).pack(side=LEFT, padx=5)
 
-second = StringVar(root)
-seconds = ('00', '01', '02', '03', '04', '05', '06', '07',
-		'08', '09', '10', '11', '12', '13', '14', '15',
-		'16', '17', '18', '19', '20', '21', '22', '23',
-		'24', '25', '26', '27', '28', '29', '30', '31',
-		'32', '33', '34', '35', '36', '37', '38', '39',
-		'40', '41', '42', '43', '44', '45', '46', '47',
-		'48', '49', '50', '51', '52', '53', '54', '55',
-		'56', '57', '58', '59', '60')
-second.set(seconds[0])
+buttons = Frame(root)
+buttons.pack(pady=10)
+Button(buttons, text="Set Alarm", command=set_alarm).pack(side=LEFT, padx=5)
+Button(buttons, text="Stop", command=stop_alarm).pack(side=LEFT, padx=5)
 
-secs = OptionMenu(frame, second, *seconds)
-secs.pack(side=LEFT)
+status = Label(root, text="No alarm set", font=("Helvetica 12"))
+status.pack()
 
-Button(root,text="Set Alarm",font=("Helvetica 15"),command=Threading).pack(pady=20)
-
-# Execute Tkinter
+update_clock()
 root.mainloop()
